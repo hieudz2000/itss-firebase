@@ -1,20 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 
 /* コンポーネント */
 import TodoItem from './TodoItem';
 import Input from './Input';
 import Filter from './Filter';
-
+import {db} from '../lib/firebase.js'
+import {getDocs,collection,onSnapshot } from 'firebase/firestore'
+import {getKey} from "../lib/util";
 /* カスタムフック */
-import useStorage from '../hooks/storage';
+// import useStorage from '../hooks/storage';
 
 /* ライブラリ */
-import {getKey} from "../lib/util";
 
 function Todo() {
-  const [items, putItems, clearItems] = useStorage();
+  // const [items, putItems, clearItems] = useStorage();
   
+  const [items,setItems] = useState([])
   const [filter, setFilter] = React.useState('ALL');
+  useEffect(()=>{
+     const unsubscribe = db.collection('todos').onSnapshot((snapshot) => {
+        const documents = snapshot.docs.map((doc) => ({
+          ...doc.data(),
+          key: doc.id,
+        }));
+  
+        setItems(documents);
+      });
+  
+      return unsubscribe;
+  },[])
 
   const displayItems = items.filter(item => {
     if (filter === 'ALL') return true;
@@ -29,12 +43,24 @@ function Todo() {
       }
       return item;
     });
-    putItems(newItems);
+    setItems(newItems)
   };
   
   const handleAdd = text => {
-    putItems([...items, { key: getKey(), text, done: false }]);
+    // putItems([...items, { key: getKey(), text, done: false }]);
+    db.collection('todos').add(
+      {
+        text,
+        done: false
+      }
+    )
   };
+  const handleDelete = () => {
+    items.forEach(item => {
+      const key = item.key
+      db.collection('todos').doc(key).delete();
+    })
+  }
   
   const handleFilterChange = value => setFilter(value);
 
@@ -64,12 +90,11 @@ function Todo() {
         {displayItems.length} items
       </div>
       <div className="panel-block">
-        <button className="button is-light is-fullwidth" onClick={clearItems}>
+        <button className="button is-light is-fullwidth" onClick={handleDelete}>
           全てのToDoを削除
         </button>
       </div>
     </article>
-  );
+  )
 }
-
 export default Todo;
